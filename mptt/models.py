@@ -106,8 +106,6 @@ class ModelBase(base.ModelBase):
 class Model(models.Model):
     __metaclass__ = ModelBase
     
-    some_field = models.CharField(blank=True, max_length=100)
-    
     class Meta:
         abstract = True
     
@@ -361,4 +359,5 @@ class Model(models.Model):
         model instance.
         """
         self._tree_manager.move_node(self, target, position)
+
 
