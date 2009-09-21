@@ -52,12 +52,8 @@ structure and provides tools for working with trees of model instances.
 Feature overview
 ----------------
 
-* Simple registration of Django model classes for MPTT - fields required
-  specifically for the tree structure will be added dynamically if
-  necessary.
-
-  In the simplest case, it's possible to use MPTT with your own models
-  without adding a single line of MPTT-related code to them.
+* An abstract Django model that you simply inherit from to provide MPTT 
+  functionality for your models.
 
 * The tree structure is automatically managed when you create or delete
   MPTT model instances. By default, new instances are added as the last
@@ -80,16 +76,15 @@ Feature overview
   This allows you to have each level of the tree automatically sorted by
   a field of your choice.
 
-* New methods are added model classes which are registered with MTTP,
-  for changing their position in the tree, retrieving their ancestors,
-  siblings and descendants, determining the number of descendants they
-  have and other tree-related operations.
+* The abstract model provides methods for models for changing their position 
+  in the tree, retrieving their ancestors, siblings and descendants, 
+  determining the number of descendants they have and other tree-related 
+  operations.
 
-* A custom ``TreeManager`` manager is added to all MPTT model classes,
-  providing tree management operations which, among other things, can be
-  used to move any node in a tree (and its descendants) to an arbitrary
-  point elsewhere in the tree, or to insert new nodes at any point in
-  the tree.
+* A custom ``TreeManager`` manager provides tree management operations which, 
+  among other things, can be used to move any node in a tree (and its 
+  descendants) to an arbitrary point elsewhere in the tree, or to insert new 
+  nodes at any point in the tree.
 
 * ``django.forms`` components for working with trees in forms.
 

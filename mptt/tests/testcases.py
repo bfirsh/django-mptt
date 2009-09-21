@@ -225,7 +225,8 @@ class DeletionTestCase(TestCase):
                                                   'left', commit=True)
         Category(name='Following root').insert_at(Category.objects.get(id=1),
                                                   'right', commit=True)
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        s = get_tree_details(Category.tree.all())
+        self.assertEqual(s,
                          tree_details("""11 - 1 0 1 2
                                          1 - 2 0 1 20
                                          2 1 2 1 2 7
@@ -238,7 +239,7 @@ class DeletionTestCase(TestCase):
                                          9 8 2 2 15 16
                                          10 8 2 2 17 18
                                          12 - 3 0 1 2"""),
-                         'Setup for test produced unexpected result')
+                         'Setup for test produced unexpected result: %s' % s)
 
         Category.objects.get(id=1).delete()
         self.assertEqual(get_tree_details(Category.tree.all()),
