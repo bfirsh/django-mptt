@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from mptt.exceptions import InvalidMove
 from mptt.tests import doctests
-from mptt.tests.models import Category, Genre
+from mptt.tests.models import Category, Genre, AnotherNode, NoParentAnotherNode, ProxyNode, NoParentProxyNode, CustomInheritAnotherNode, InheritAnotherNode, CustomAnotherNode, ProxyCustomAnotherNode
 
 def get_tree_details(nodes):
     """Creates pertinent tree details for the given list of nodes."""
@@ -308,3 +308,118 @@ class InterTreeMovementTestCase(TestCase):
 
 class PositionedInsertionTestCase(TestCase):
     pass
+
+
+class BaseInheritanceTest(object):
+    def setUp(self):
+        root = self.model.objects.create(name='A root node', size=10)
+        root = self.model.objects.get(pk=root.pk)
+        n1 = self.model.objects.create(parent=root, name='First child', size=3)
+        n1 = self.model.objects.get(pk=n1.pk)
+        self.model.objects.create(parent=n1, name='First child of first child', size=1)
+        n1 = self.model.objects.get(pk=n1.pk)
+        self.model.objects.create(parent=n1, name='Second child of first child', size=4)
+        root = self.model.objects.get(pk=root.pk)
+        self.model.objects.create(parent=root, name='Second child', size=2)
+        
+        self.root = self.model.objects.get(pk=root.pk)
+
+    def test_fields(self):
+        self.assertEqual(self.root.name, 'A root node')
+        self.assertEqual(self.root.size, 10)
+        self.assertEqual(self.root.parent, None)
+        self.assertEqual(self.root.lft, 1)
+        self.assertEqual(self.root.rght, 10)
+        self.assertEqual(self.root.level, 0)
+        self.assertTrue(self.root.tree_id > 0)
+        
+    def test_creation(self):
+        self.assertEqual(get_tree_details(self.model.tree.all()),
+                         tree_details("""1 - 1 0 1 10
+                                         2 1 1 1 2 7
+                                         3 2 1 2 3 4
+                                         4 2 1 2 5 6
+                                         5 1 1 1 8 9"""))
+    
+    def test_move(self):
+        """
+        Test an operation just to ensure the options are working correctly.
+        """
+        n = self.root.get_children()[0].get_children()[1]
+        n.move_to(self.root, position='last-child')
+        self.assertEqual(self.root.get_children()[2], n)
+        
+
+class AnotherNodeTest(BaseInheritanceTest, TestCase):
+    """
+    Test a model that inherits from an abstract model with a parent field that 
+    inherits from mptt.Model.
+    """
+    model = AnotherNode
+    
+class NoParentAnotherNodeTest(AnotherNodeTest):
+    """
+    Test a model with a parent field that inherits from an abstract model that 
+    inherits from mptt.Model.
+    """
+    model = NoParentAnotherNode
+
+class ProxyNodeTest(BaseInheritanceTest, TestCase):
+    """
+    Test a proxy model that inherits from a normal model that inherits from an 
+    abstract model with a parent field that inherits from mptt.Model.
+    """
+    model = ProxyNode
+    
+    def test_overriden_method(self):
+        assert self.root.get_next_sibling() == 'wurble'
+    
+class NoParentProxyNodeTest(ProxyNodeTest):
+    """
+    Test a proxy model that inherits from a normal model with a parent field 
+    that inherits from an abstract model that inherits from mptt.Model.
+    """
+    model = NoParentProxyNode
+
+
+class InheritAnotherNodeTest(BaseInheritanceTest, TestCase):
+    """
+    Test a normal model inheriting from another normal model which inherits 
+    from an abstract model with a parent field which inherits from mptt.Model.
+    """
+    model = InheritAnotherNode
+    
+    def test_additional_field(self):
+        self.assertEqual(self.root.number, 101)
+
+
+class CustomInheritAnotherNodeTest(InheritAnotherNodeTest):
+    """
+    Test that setting MPTT options on an inherited model does nothing.
+    """
+    model = CustomInheritAnotherNode
+
+
+class CustomAnotherNodeTest(BaseInheritanceTest, TestCase):
+    """
+    Test a model with MPTT options set that inherits from and overrides some 
+    options on an abstract model which inherits from mptt.Model.
+    """
+    model = CustomAnotherNode
+
+    def test_fields(self):
+        self.assertEqual(self.root.name, 'A root node')
+        self.assertEqual(self.root.size, 10)
+        self.assertEqual(self.root.parent, None)
+        self.assertEqual(self.root.leftle, 1)
+        self.assertEqual(self.root.rightle, 10)
+        self.assertEqual(self.root.level, 0)
+        self.assertTrue(self.root.tree_id > 0)
+
+class ProxyCustomAnotherNodeTest(CustomAnotherNodeTest):
+    """
+    Test that setting MPTT options on a proxy model does nothing.
+    """
+    model = ProxyCustomAnotherNode
+    
+

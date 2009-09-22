@@ -72,10 +72,7 @@ def _get_ordered_insertion_target(node, parent):
 class ModelBase(base.ModelBase):
     def __init__(cls, name, bases, attrs):
         super(ModelBase, cls).__init__(name, bases, attrs)
-        if not [b for b in bases if isinstance(b, ModelBase)]:
-            # This isn't a subclass of our Model class, so don't do anything
-            return
-        meta = {
+        default_mptt_meta = {
             'parent_attr': 'parent',
             'right_attr': 'rght',
             'left_attr': 'lft',
@@ -84,23 +81,53 @@ class ModelBase(base.ModelBase):
             'tree_manager_attr': 'tree',
             'order_insertion_by': None,
         }
-        if hasattr(cls, 'MpttMeta'):
-            for key in meta.keys():
-                try:
-                    meta[key] = getattr(cls.MpttMeta, key)
-                except AttributeError:
-                    pass
-        for k in ('left_attr', 'right_attr', 'tree_id_attr', 'level_attr'):
-            cls.add_to_class(meta[k], models.PositiveIntegerField(db_index=True, editable=False))
-        cls.add_to_class('objects', models.Manager())
-        cls.add_to_class(meta['tree_manager_attr'], TreeManager(
-            meta['parent_attr'], meta['left_attr'], meta['right_attr'], 
-            meta['tree_id_attr'], meta['level_attr']))
-        setattr(cls, '_tree_manager', 
-            getattr(cls, meta['tree_manager_attr']))
+        concrete_parent = False
+        for base in bases:
+            if not isinstance(base, ModelBase) or not hasattr(base, '_meta'):
+                # Things without _meta aren't functional models, so they're
+                # uninteresting parents.
+                continue
+            # Inherit MPTT metadata which differs from default and not already
+            # set by a previous parent
+            for attr, default in default_mptt_meta.items():
+                val = getattr(base._meta, attr, default)
+                if val != default:
+                    setattr(cls._meta, attr, val)
+            
+            if not base._meta.abstract:
+                concrete_parent = True
         
-        for k, v in meta.items():
-            setattr(cls._meta, k, v)
+        for attr, default in default_mptt_meta.items():
+            # Set the default metadata for attributes not set by parents
+            if not hasattr(cls._meta, attr):
+                setattr(cls._meta, attr, default)
+        
+        if concrete_parent:
+            # This inherits from a concrete model, so don't add any fields or 
+            # managers. Also, any MpttMeta classes will be ignored, since 
+            # they won't have any effect
+            return
+        
+        for attr, default in default_mptt_meta.items():
+            if hasattr(cls, 'MpttMeta'):
+                # Anything in MpttMeta overrides all
+                meta_val = getattr(cls.MpttMeta, attr, None)
+                if meta_val is not None:
+                    setattr(cls._meta, attr, meta_val)
+        
+        if cls._meta.abstract or cls._meta.proxy:
+            # Don't add any fields to abstract or proxy models
+            return
+        
+        opts = cls._meta
+        for attr in (opts.left_attr, opts.right_attr, 
+                     opts.tree_id_attr, opts.level_attr):
+            cls.add_to_class(attr, models.PositiveIntegerField(db_index=True, editable=False))
+        cls.add_to_class(opts.tree_manager_attr, TreeManager(
+                opts.parent_attr, opts.left_attr, opts.right_attr, 
+                opts.tree_id_attr, opts.level_attr))
+        setattr(cls, '_tree_manager', 
+                getattr(cls, opts.tree_manager_attr))
         
 
 class Model(models.Model):
