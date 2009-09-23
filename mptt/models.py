@@ -7,6 +7,7 @@ import copy
 from django.db import models
 from django.db.models import base
 from django.db.models.query import Q
+from django.utils.datastructures import SortedDict
 from mptt.managers import TreeManager
 import operator
 
@@ -131,6 +132,19 @@ class ModelBase(base.ModelBase):
         
 
 class Model(models.Model):
+    """
+    An abstract model that provides all the fields and methods required for 
+    MPTT.
+    
+    Example:
+    
+        import mptt
+
+        class Category(mptt.Model):
+            name = models.CharField(max_length=50, unique=True)
+            parent = models.ForeignKey('self', null=True, blank=True, 
+                                       related_name='children')
+    """
     __metaclass__ = ModelBase
     
     class Meta:
@@ -386,5 +400,115 @@ class Model(models.Model):
         model instance.
         """
         self._tree_manager.move_node(self, target, position)
+
+
+class LoadTreeModel(Model):
+    """
+    A subclass of Model that loads the entire tree whenever a method is called
+    that hits the database. The tree can then be traversed in memory.
+    """
+    class Meta:
+        abstract = True
+    
+    def __init__(self, *args, **kwargs):
+        super(LoadTreeModel, self).__init__(*args, **kwargs)
+        self._children_cache = None
+    
+    def populate_tree_cache(self):
+        # Cache has already been filled
+        if self._children_cache is not None:
+            return
+        opts = self._meta
+        nodes = self._tree_manager.filter(**{
+                    opts.tree_id_attr: getattr(self, opts.tree_id_attr)})
+        node_dict = SortedDict([(n.pk, n) for n in nodes])
+        for node in node_dict.values():
+            if node == self:
+                node = node_dict[node.pk] = self
+            # _children_cache will only be modified up the tree, so initialise
+            # it when we're going down
+            node._children_cache = []
+            # Ensure parent points to our object with the cache
+            parent_id = getattr(node, '%s_id' % opts.parent_attr)
+            if parent_id is not None:
+                setattr(node, opts.parent_attr, node_dict[parent_id])
+                node_dict[parent_id]._children_cache.append(node)
+        
+    def clear_tree_cache(self):
+        if self._children_cache is None:
+            return
+        for c in self.get_children():
+            c.clear_tree_cache()
+        self._children_cache = None
+    
+    def save(self, *args, **kwargs):
+        self.clear_tree_cache()
+        super(LoadTreeModel, self).save(*args, **kwargs)
+    
+    def get_ancestors(self, ascending=False):
+        self.populate_tree_cache()
+        ancestors = []
+        node = self
+        while node.parent is not None:
+            ancestors.append(node.parent)
+            node = node.parent
+        if not ascending:
+            ancestors.reverse()
+        return ancestors
+    
+    def get_children(self):
+        self.populate_tree_cache()
+        return self._children_cache[:]
+    
+    def get_descendants(self, include_self=False):
+        self.populate_tree_cache()
+        descendants = []
+        if include_self:
+            descendants.append(self)
+        for c in self._children_cache:
+            descendants.extend(c.get_descendants(include_self=True))
+        return descendants
+    
+    def get_next_sibling(self):
+        if self.is_root_node():
+            return super(LoadTreeModel, self).get_next_sibling()
+        self.populate_tree_cache()
+        for i, child in enumerate(self.parent._children_cache):
+            if child == self:
+                try:
+                    return self.parent._children_cache[i+1]
+                except IndexError:
+                    return None
+    
+    def get_previous_sibling(self):
+        if self.is_root_node():
+            return super(LoadTreeModel, self).get_previous_sibling()
+        self.populate_tree_cache()
+        for i, child in enumerate(self.parent._children_cache):
+            if child == self:
+                if i == 0:
+                    return None
+                return self.parent._children_cache[i-1]
+        
+    def get_root(self):
+        self.populate_tree_cache()
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
+    
+    def get_siblings(self, include_self=False):
+        if self.is_root_node():
+            return super(LoadTreeModel, self).get_siblings(include_self)
+        self.populate_tree_cache()
+        # get_children copies so we can non-destructively remove below
+        siblings = self.parent.get_children()
+        if not include_self:
+            siblings.remove(self)
+        return siblings
+    
+    def move_to(self, target, position='first-child'):
+        self.clear_tree_cache()
+        return super(LoadTreeModel, self).move_to(target, position)
 
 

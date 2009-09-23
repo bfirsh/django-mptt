@@ -1,10 +1,12 @@
 import re
 
+from django.conf import settings
+from django.db import connection
 from django.test import TestCase
 
 from mptt.exceptions import InvalidMove
 from mptt.tests import doctests
-from mptt.tests.models import Category, Genre, AnotherNode, NoParentAnotherNode, ProxyNode, NoParentProxyNode, CustomInheritAnotherNode, InheritAnotherNode, CustomAnotherNode, ProxyCustomAnotherNode
+from mptt.tests import models
 
 def get_tree_details(nodes):
     """Creates pertinent tree details for the given list of nodes."""
@@ -26,7 +28,7 @@ def tree_details(text):
     """
     return leading_whitespace_re.sub('', text)
 
-# genres.json defines the following tree structure
+# models.Genres.json defines the following tree structure
 #
 # 1 - 1 0 1 16   action
 # 2 1 1 1 2 9    +-- platformer
@@ -49,11 +51,11 @@ class ReparentingTestCase(TestCase):
     fixtures = ['genres.json']
 
     def test_new_root_from_subtree(self):
-        shmup = Genre.objects.get(id=6)
+        shmup = models.Genre.objects.get(id=6)
         shmup.parent = None
         shmup.save()
         self.assertEqual(get_tree_details([shmup]), '6 - 3 0 1 6')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 10
                                          2 1 1 1 2 9
                                          3 2 1 2 3 4
@@ -67,11 +69,11 @@ class ReparentingTestCase(TestCase):
                                          8 6 3 1 4 5"""))
 
     def test_new_root_from_leaf_with_siblings(self):
-        platformer_2d = Genre.objects.get(id=3)
+        platformer_2d = models.Genre.objects.get(id=3)
         platformer_2d.parent = None
         platformer_2d.save()
         self.assertEqual(get_tree_details([platformer_2d]), '3 - 3 0 1 2')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 14
                                          2 1 1 1 2 7
                                          4 2 1 2 3 4
@@ -85,12 +87,12 @@ class ReparentingTestCase(TestCase):
                                          3 - 3 0 1 2"""))
 
     def test_new_child_from_root(self):
-        action = Genre.objects.get(id=1)
-        rpg = Genre.objects.get(id=9)
+        action = models.Genre.objects.get(id=1)
+        rpg = models.Genre.objects.get(id=9)
         action.parent = rpg
         action.save()
         self.assertEqual(get_tree_details([action]), '1 9 2 1 6 21')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""9 - 2 0 1 22
                                          10 9 2 1 2 3
                                          11 9 2 1 4 5
@@ -104,12 +106,12 @@ class ReparentingTestCase(TestCase):
                                          8 6 2 3 18 19"""))
 
     def test_move_leaf_to_other_tree(self):
-        shmup_horizontal = Genre.objects.get(id=8)
-        rpg = Genre.objects.get(id=9)
+        shmup_horizontal = models.Genre.objects.get(id=8)
+        rpg = models.Genre.objects.get(id=9)
         shmup_horizontal.parent = rpg
         shmup_horizontal.save()
         self.assertEqual(get_tree_details([shmup_horizontal]), '8 9 2 1 6 7')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 14
                                          2 1 1 1 2 9
                                          3 2 1 2 3 4
@@ -123,12 +125,12 @@ class ReparentingTestCase(TestCase):
                                          8 9 2 1 6 7"""))
 
     def test_move_subtree_to_other_tree(self):
-        shmup = Genre.objects.get(id=6)
-        trpg = Genre.objects.get(id=11)
+        shmup = models.Genre.objects.get(id=6)
+        trpg = models.Genre.objects.get(id=11)
         shmup.parent = trpg
         shmup.save()
         self.assertEqual(get_tree_details([shmup]), '6 11 2 2 5 10')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 10
                                          2 1 1 1 2 9
                                          3 2 1 2 3 4
@@ -142,12 +144,12 @@ class ReparentingTestCase(TestCase):
                                          8 6 2 3 8 9"""))
 
     def test_move_child_up_level(self):
-        shmup_horizontal = Genre.objects.get(id=8)
-        action = Genre.objects.get(id=1)
+        shmup_horizontal = models.Genre.objects.get(id=8)
+        action = models.Genre.objects.get(id=1)
         shmup_horizontal.parent = action
         shmup_horizontal.save()
         self.assertEqual(get_tree_details([shmup_horizontal]), '8 1 1 1 14 15')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 16
                                          2 1 1 1 2 9
                                          3 2 1 2 3 4
@@ -161,12 +163,12 @@ class ReparentingTestCase(TestCase):
                                          11 9 2 1 4 5"""))
 
     def test_move_subtree_down_level(self):
-        shmup = Genre.objects.get(id=6)
-        platformer = Genre.objects.get(id=2)
+        shmup = models.Genre.objects.get(id=6)
+        platformer = models.Genre.objects.get(id=2)
         shmup.parent = platformer
         shmup.save()
         self.assertEqual(get_tree_details([shmup]), '6 2 1 2 9 14')
-        self.assertEqual(get_tree_details(Genre.tree.all()),
+        self.assertEqual(get_tree_details(models.Genre.tree.all()),
                          tree_details("""1 - 1 0 1 16
                                          2 1 1 1 2 15
                                          3 2 1 2 3 4
@@ -181,15 +183,15 @@ class ReparentingTestCase(TestCase):
 
     def test_invalid_moves(self):
         # A node may not be made a child of itself
-        action = Genre.objects.get(id=1)
+        action = models.Genre.objects.get(id=1)
         action.parent = action
-        platformer = Genre.objects.get(id=2)
+        platformer = models.Genre.objects.get(id=2)
         platformer.parent = platformer
         self.assertRaises(InvalidMove, action.save)
         self.assertRaises(InvalidMove, platformer.save)
 
         # A node may not be made a child of any of its descendants
-        platformer_4d = Genre.objects.get(id=5)
+        platformer_4d = models.Genre.objects.get(id=5)
         action.parent = platformer_4d
         platformer.parent = platformer_4d
         self.assertRaises(InvalidMove, action.save)
@@ -221,11 +223,11 @@ class DeletionTestCase(TestCase):
 
     def test_delete_root_node(self):
         # Add a few other roots to verify that they aren't affected
-        Category(name='Preceding root').insert_at(Category.objects.get(id=1),
+        models.Category(name='Preceding root').insert_at(models.Category.objects.get(id=1),
                                                   'left', commit=True)
-        Category(name='Following root').insert_at(Category.objects.get(id=1),
+        models.Category(name='Following root').insert_at(models.Category.objects.get(id=1),
                                                   'right', commit=True)
-        s = get_tree_details(Category.tree.all())
+        s = get_tree_details(models.Category.tree.all())
         self.assertEqual(s,
                          tree_details("""11 - 1 0 1 2
                                          1 - 2 0 1 20
@@ -241,14 +243,14 @@ class DeletionTestCase(TestCase):
                                          12 - 3 0 1 2"""),
                          'Setup for test produced unexpected result: %s' % s)
 
-        Category.objects.get(id=1).delete()
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        models.Category.objects.get(id=1).delete()
+        self.assertEqual(get_tree_details(models.Category.tree.all()),
                          tree_details("""11 - 1 0 1 2
                                          12 - 3 0 1 2"""))
 
     def test_delete_last_node_with_siblings(self):
-        Category.objects.get(id=9).delete()
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        models.Category.objects.get(id=9).delete()
+        self.assertEqual(get_tree_details(models.Category.tree.all()),
                          tree_details("""1 - 1 0 1 18
                                          2 1 1 1 2 7
                                          3 2 1 2 3 4
@@ -260,8 +262,8 @@ class DeletionTestCase(TestCase):
                                          10 8 1 2 15 16"""))
 
     def test_delete_last_node_with_descendants(self):
-        Category.objects.get(id=8).delete()
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        models.Category.objects.get(id=8).delete()
+        self.assertEqual(get_tree_details(models.Category.tree.all()),
                          tree_details("""1 - 1 0 1 14
                                          2 1 1 1 2 7
                                          3 2 1 2 3 4
@@ -271,8 +273,8 @@ class DeletionTestCase(TestCase):
                                          7 5 1 2 11 12"""))
 
     def test_delete_node_with_siblings(self):
-        Category.objects.get(id=6).delete()
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        models.Category.objects.get(id=6).delete()
+        self.assertEqual(get_tree_details(models.Category.tree.all()),
                          tree_details("""1 - 1 0 1 18
                                          2 1 1 1 2 7
                                          3 2 1 2 3 4
@@ -290,8 +292,8 @@ class DeletionTestCase(TestCase):
         deleted, rather than just the node on which ``delete()`` was
         called.
         """
-        Category.objects.get(id=5).delete()
-        self.assertEqual(get_tree_details(Category.tree.all()),
+        models.Category.objects.get(id=5).delete()
+        self.assertEqual(get_tree_details(models.Category.tree.all()),
                          tree_details("""1 - 1 0 1 14
                                          2 1 1 1 2 7
                                          3 2 1 2 3 4
@@ -355,21 +357,21 @@ class AnotherNodeTest(BaseInheritanceTest, TestCase):
     Test a model that inherits from an abstract model with a parent field that 
     inherits from mptt.Model.
     """
-    model = AnotherNode
+    model = models.AnotherNode
     
 class NoParentAnotherNodeTest(AnotherNodeTest):
     """
     Test a model with a parent field that inherits from an abstract model that 
     inherits from mptt.Model.
     """
-    model = NoParentAnotherNode
+    model = models.NoParentAnotherNode
 
 class ProxyNodeTest(BaseInheritanceTest, TestCase):
     """
     Test a proxy model that inherits from a normal model that inherits from an 
     abstract model with a parent field that inherits from mptt.Model.
     """
-    model = ProxyNode
+    model = models.ProxyNode
     
     def test_overriden_method(self):
         assert self.root.get_next_sibling() == 'wurble'
@@ -379,7 +381,7 @@ class NoParentProxyNodeTest(ProxyNodeTest):
     Test a proxy model that inherits from a normal model with a parent field 
     that inherits from an abstract model that inherits from mptt.Model.
     """
-    model = NoParentProxyNode
+    model = models.NoParentProxyNode
 
 
 class InheritAnotherNodeTest(BaseInheritanceTest, TestCase):
@@ -387,7 +389,7 @@ class InheritAnotherNodeTest(BaseInheritanceTest, TestCase):
     Test a normal model inheriting from another normal model which inherits 
     from an abstract model with a parent field which inherits from mptt.Model.
     """
-    model = InheritAnotherNode
+    model = models.InheritAnotherNode
     
     def test_additional_field(self):
         self.assertEqual(self.root.number, 101)
@@ -397,7 +399,7 @@ class CustomInheritAnotherNodeTest(InheritAnotherNodeTest):
     """
     Test that setting MPTT options on an inherited model does nothing.
     """
-    model = CustomInheritAnotherNode
+    model = models.CustomInheritAnotherNode
 
 
 class CustomAnotherNodeTest(BaseInheritanceTest, TestCase):
@@ -405,7 +407,7 @@ class CustomAnotherNodeTest(BaseInheritanceTest, TestCase):
     Test a model with MPTT options set that inherits from and overrides some 
     options on an abstract model which inherits from mptt.Model.
     """
-    model = CustomAnotherNode
+    model = models.CustomAnotherNode
 
     def test_fields(self):
         self.assertEqual(self.root.name, 'A root node')
@@ -420,6 +422,102 @@ class ProxyCustomAnotherNodeTest(CustomAnotherNodeTest):
     """
     Test that setting MPTT options on a proxy model does nothing.
     """
-    model = ProxyCustomAnotherNode
+    model = models.ProxyCustomAnotherNode
     
+
+class LoadTreeNodeTest(TestCase):
+    fixtures = ['loadtreenode.json']
+        
+    def test_get_children(self):
+        root = models.LoadTreeNode.objects.get(tree_id=1, parent=None)
+        assert [c.pk for c in root.get_children()] == [2, 5, 8]
+        assert [c.pk for c in root.get_children()[0].get_children()] == [3, 4]
+        assert [c.pk for c in root.get_children()[1].get_children()] == [6, 7]
+        assert [c.pk for c in root.get_children()[2].get_children()] == [9, 10]
+        
+    def test_get_ancestors(self):
+        node = models.LoadTreeNode.objects.get(pk=9)
+        assert [c.pk for c in node.get_ancestors()] == [1, 8]
+        assert [c.pk for c in node.get_ancestors(ascending=True)] == [8, 1]
+    
+    def test_get_descendants_on_root(self):
+        node = models.LoadTreeNode.objects.get(tree_id=1, parent=None)
+        assert [c.pk for c in node.get_descendants()] == [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        assert [c.pk for c in node.get_descendants(include_self=True)] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        
+    def test_get_descendants_on_node(self):
+        node = models.LoadTreeNode.objects.get(pk=5)
+        assert [c.pk for c in node.get_descendants()] == [6, 7]
+        assert [c.pk for c in node.get_descendants(include_self=True)] == [5, 6, 7]
+    
+    def test_get_descendants_on_leaf(self):
+        node = models.LoadTreeNode.objects.get(pk=7)
+        assert [c.pk for c in node.get_descendants()] == []
+        assert [c.pk for c in node.get_descendants(include_self=True)] == [7]
+    
+    def test_get_next_sibling(self):
+        m = models.LoadTreeNode.objects
+        assert m.get(pk=2).get_next_sibling().id == 5
+        assert m.get(pk=6).get_next_sibling().id == 7
+        assert m.get(pk=7).get_next_sibling() == None
+    
+    def test_get_previous_sibling(self):
+        m = models.LoadTreeNode.objects
+        assert m.get(pk=2).get_previous_sibling() == None
+        assert m.get(pk=7).get_previous_sibling().id == 6
+        assert m.get(pk=8).get_previous_sibling().id == 5
+    
+    def test_get_root(self):
+        m = models.LoadTreeNode.objects
+        root = m.get(tree_id=1, parent=None)
+        for node in m.all():
+            assert node.get_root() == root
+    
+    def test_get_siblings_on_node(self):
+        node = models.LoadTreeNode.objects.get(pk=2)
+        assert [c.pk for c in node.get_siblings()] == [5, 8]
+        assert [c.pk for c in node.get_siblings(include_self=True)] == [2, 5, 8]
+    
+    def test_get_siblings_on_leaf(self):
+        node = models.LoadTreeNode.objects.get(pk=3)
+        assert [c.pk for c in node.get_siblings()] == [4]
+        assert [c.pk for c in node.get_siblings(include_self=True)] == [3, 4]
+    
+    def test_clearing_cache_on_save(self):
+        node = models.LoadTreeNode.objects.get(pk=3)
+        # This will populate the cache
+        root = node.get_root()
+        root.name = 'Foo'
+        # Wipe the cache
+        root.save()
+        # Populate the cache again
+        assert node.get_root().name == 'Foo'
+    
+    def test_clearing_cache_on_move(self):
+        pass
+    
+    def test_query_count(self):
+        """
+        Test that we can traverse the tree without hitting the database.
+        """
+        # Queries aren't logged with debug switched off
+        original_debug = settings.DEBUG
+        settings.DEBUG = True
+        query_count = len(connection.queries)
+        node = models.LoadTreeNode.objects.get(pk=6)
+        parent_node = node
+        root_node = node.get_root()
+        for n in (node, parent_node, root_node):
+            n.get_root()
+            n.get_ancestors()
+            n.get_children()
+            n.get_descendants()
+            if not n.is_root_node():
+                n.get_next_sibling()
+                n.get_previous_sibling()
+                n.get_siblings()
+        settings.DEBUG = original_debug
+        assert len(connection.queries) == query_count + 2
+        
+        
 

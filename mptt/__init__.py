@@ -1,6 +1,6 @@
-from mptt.models import Model
+from mptt.models import Model, LoadTreeModel
 
 VERSION = (0, 3, 'pre')
 
-__all__ = ('Model',)
+__all__ = ('Model', 'LoadTreeModel')
 

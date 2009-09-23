@@ -137,4 +137,10 @@ class ProxyCustomAnotherNode(CustomAnotherNode):
         right_attr = 'atall'
     
 
-
+class LoadTreeNode(mptt.LoadTreeModel):
+    name = models.CharField(max_length=50)
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
+    
+    def __unicode__(self):
+        return self.name
+    
