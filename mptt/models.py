@@ -443,7 +443,7 @@ class LoadTreeModel(Model):
             node = self.get_root()
         for c in node._children_cache:
             c.clear_tree_cache(relative=True)
-        self._children_cache = None
+        node._children_cache = None
     
     def save(self, *args, **kwargs):
         self.clear_tree_cache()

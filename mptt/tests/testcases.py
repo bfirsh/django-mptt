@@ -499,6 +499,25 @@ class LoadTreeNodeTest(TestCase):
         # Populate the cache again
         self.assertEqual(node.get_children()[0].name, 'Foo')
     
+    def test_clearing_root_cache_on_save(self):
+        """
+        Check saving a child also clears the root node cache.
+        """
+        node = models.LoadTreeNode.objects.get(pk=1)
+        # This will populate the cache
+        child = node.get_children()[0]
+        # Get a new copy of the root
+        child_copy = models.LoadTreeNode.objects.get(pk=2)
+        self.assertEqual(child, child_copy)
+        child_copy.name = 'Foo'
+        # This is not in the cached tree, so it won't clear the cache
+        child_copy.save()
+        self.assertNotEqual(node.get_children()[0].name, 'Foo')
+        # Clear the cache
+        node.get_children()[1].save()
+        # Populate the cache again
+        self.assertEqual(node.get_children()[0].name, 'Foo')
+    
     def test_clearing_cache_on_move(self):
         node = models.LoadTreeNode.objects.get(pk=2)
         # Populates cache
