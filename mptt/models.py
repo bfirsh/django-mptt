@@ -434,11 +434,15 @@ class LoadTreeModel(Model):
                 setattr(node, opts.parent_attr, node_dict[parent_id])
                 node_dict[parent_id]._children_cache.append(node)
         
-    def clear_tree_cache(self):
+    def clear_tree_cache(self, relative=False):
         if self._children_cache is None:
             return
-        for c in self.get_children():
-            c.clear_tree_cache()
+        if relative:
+            node = self
+        else:
+            node = self.get_root()
+        for c in node._children_cache:
+            c.clear_tree_cache(relative=True)
         self._children_cache = None
     
     def save(self, *args, **kwargs):

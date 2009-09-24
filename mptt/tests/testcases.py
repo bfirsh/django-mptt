@@ -374,7 +374,7 @@ class ProxyNodeTest(BaseInheritanceTest, TestCase):
     model = models.ProxyNode
     
     def test_overriden_method(self):
-        assert self.root.get_next_sibling() == 'wurble'
+        self.assertEqual(self.root.get_next_sibling(), 'wurble')
     
 class NoParentProxyNodeTest(ProxyNodeTest):
     """
@@ -430,71 +430,83 @@ class LoadTreeNodeTest(TestCase):
         
     def test_get_children(self):
         root = models.LoadTreeNode.objects.get(tree_id=1, parent=None)
-        assert [c.pk for c in root.get_children()] == [2, 5, 8]
-        assert [c.pk for c in root.get_children()[0].get_children()] == [3, 4]
-        assert [c.pk for c in root.get_children()[1].get_children()] == [6, 7]
-        assert [c.pk for c in root.get_children()[2].get_children()] == [9, 10]
+        self.assertEqual([c.pk for c in root.get_children()], [2, 5, 8])
+        self.assertEqual([c.pk for c in root.get_children()[0].get_children()], [3, 4])
+        self.assertEqual([c.pk for c in root.get_children()[1].get_children()], [6, 7])
+        self.assertEqual([c.pk for c in root.get_children()[2].get_children()], [9, 10])
         
     def test_get_ancestors(self):
         node = models.LoadTreeNode.objects.get(pk=9)
-        assert [c.pk for c in node.get_ancestors()] == [1, 8]
-        assert [c.pk for c in node.get_ancestors(ascending=True)] == [8, 1]
+        self.assertEqual([c.pk for c in node.get_ancestors()], [1, 8])
+        self.assertEqual([c.pk for c in node.get_ancestors(ascending=True)], [8, 1])
     
     def test_get_descendants_on_root(self):
         node = models.LoadTreeNode.objects.get(tree_id=1, parent=None)
-        assert [c.pk for c in node.get_descendants()] == [2, 3, 4, 5, 6, 7, 8, 9, 10]
-        assert [c.pk for c in node.get_descendants(include_self=True)] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        self.assertEqual([c.pk for c in node.get_descendants()], [2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([c.pk for c in node.get_descendants(include_self=True)], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         
     def test_get_descendants_on_node(self):
         node = models.LoadTreeNode.objects.get(pk=5)
-        assert [c.pk for c in node.get_descendants()] == [6, 7]
-        assert [c.pk for c in node.get_descendants(include_self=True)] == [5, 6, 7]
+        self.assertEqual([c.pk for c in node.get_descendants()], [6, 7])
+        self.assertEqual([c.pk for c in node.get_descendants(include_self=True)], [5, 6, 7])
     
     def test_get_descendants_on_leaf(self):
         node = models.LoadTreeNode.objects.get(pk=7)
-        assert [c.pk for c in node.get_descendants()] == []
-        assert [c.pk for c in node.get_descendants(include_self=True)] == [7]
+        self.assertEqual([c.pk for c in node.get_descendants()], [])
+        self.assertEqual([c.pk for c in node.get_descendants(include_self=True)], [7])
     
     def test_get_next_sibling(self):
         m = models.LoadTreeNode.objects
-        assert m.get(pk=2).get_next_sibling().id == 5
-        assert m.get(pk=6).get_next_sibling().id == 7
-        assert m.get(pk=7).get_next_sibling() == None
+        self.assertEqual(m.get(pk=2).get_next_sibling().id, 5)
+        self.assertEqual(m.get(pk=6).get_next_sibling().id, 7)
+        self.assertEqual(m.get(pk=7).get_next_sibling(), None)
     
     def test_get_previous_sibling(self):
         m = models.LoadTreeNode.objects
-        assert m.get(pk=2).get_previous_sibling() == None
-        assert m.get(pk=7).get_previous_sibling().id == 6
-        assert m.get(pk=8).get_previous_sibling().id == 5
+        self.assertEqual(m.get(pk=2).get_previous_sibling(), None)
+        self.assertEqual(m.get(pk=7).get_previous_sibling().id, 6)
+        self.assertEqual(m.get(pk=8).get_previous_sibling().id, 5)
     
     def test_get_root(self):
         m = models.LoadTreeNode.objects
         root = m.get(tree_id=1, parent=None)
         for node in m.all():
-            assert node.get_root() == root
+            self.assertEqual(node.get_root(), root)
     
     def test_get_siblings_on_node(self):
         node = models.LoadTreeNode.objects.get(pk=2)
-        assert [c.pk for c in node.get_siblings()] == [5, 8]
-        assert [c.pk for c in node.get_siblings(include_self=True)] == [2, 5, 8]
+        self.assertEqual([c.pk for c in node.get_siblings()], [5, 8])
+        self.assertEqual([c.pk for c in node.get_siblings(include_self=True)], [2, 5, 8])
     
     def test_get_siblings_on_leaf(self):
         node = models.LoadTreeNode.objects.get(pk=3)
-        assert [c.pk for c in node.get_siblings()] == [4]
-        assert [c.pk for c in node.get_siblings(include_self=True)] == [3, 4]
+        self.assertEqual([c.pk for c in node.get_siblings()], [4])
+        self.assertEqual([c.pk for c in node.get_siblings(include_self=True)], [3, 4])
     
     def test_clearing_cache_on_save(self):
-        node = models.LoadTreeNode.objects.get(pk=3)
+        node = models.LoadTreeNode.objects.get(pk=2)
         # This will populate the cache
-        root = node.get_root()
-        root.name = 'Foo'
-        # Wipe the cache
-        root.save()
+        child = node.get_children()[0]
+        # Get a new copy of the root
+        child_copy = models.LoadTreeNode.objects.get(pk=3)
+        self.assertEqual(child, child_copy)
+        child_copy.name = 'Foo'
+        # This is not in the cached tree, so it won't clear the cache
+        child_copy.save()
+        self.assertNotEqual(node.get_children()[0].name, 'Foo')
+        # Clear the cache
+        node.save()
         # Populate the cache again
-        assert node.get_root().name == 'Foo'
+        self.assertEqual(node.get_children()[0].name, 'Foo')
     
     def test_clearing_cache_on_move(self):
-        pass
+        node = models.LoadTreeNode.objects.get(pk=2)
+        # Populates cache
+        self.assertEqual([c.pk for c in node.get_children()], [3, 4])
+        # Clears cache
+        node.get_children()[0].move_to(node, 'last-child')
+        # Repopulates cached
+        self.assertEqual([c.pk for c in node.get_children()], [4, 3])
     
     def test_query_count(self):
         """
@@ -505,6 +517,7 @@ class LoadTreeNodeTest(TestCase):
         settings.DEBUG = True
         query_count = len(connection.queries)
         node = models.LoadTreeNode.objects.get(pk=6)
+        self.assertEqual(len(connection.queries), query_count + 1)
         parent_node = node
         root_node = node.get_root()
         for n in (node, parent_node, root_node):
@@ -517,7 +530,7 @@ class LoadTreeNodeTest(TestCase):
                 n.get_previous_sibling()
                 n.get_siblings()
         settings.DEBUG = original_debug
-        assert len(connection.queries) == query_count + 2
+        self.assertEqual(len(connection.queries), query_count + 2)
         
         
 
