@@ -46,7 +46,12 @@ class TreeManager(models.Manager):
         self.right_attr = right_attr
         self.tree_id_attr = tree_id_attr
         self.level_attr = level_attr
-
+    
+    def contribute_to_class(self, model, name):
+        super(TreeManager, self).contribute_to_class(model, name)
+        if not getattr(model, '_tree_manager', None) or self.creation_counter < model._tree_manager.creation_counter:
+            model._tree_manager = self
+    
     def add_related_count(self, queryset, rel_model, rel_field, count_attr,
                           cumulative=False):
         """

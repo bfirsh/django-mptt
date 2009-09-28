@@ -124,11 +124,10 @@ class ModelBase(base.ModelBase):
         for attr in (opts.left_attr, opts.right_attr, 
                      opts.tree_id_attr, opts.level_attr):
             cls.add_to_class(attr, models.PositiveIntegerField(db_index=True, editable=False))
-        cls.add_to_class(opts.tree_manager_attr, TreeManager(
-                opts.parent_attr, opts.left_attr, opts.right_attr, 
-                opts.tree_id_attr, opts.level_attr))
-        setattr(cls, '_tree_manager', 
-                getattr(cls, opts.tree_manager_attr))
+        if not hasattr(cls, opts.tree_manager_attr):
+            cls.add_to_class(opts.tree_manager_attr, TreeManager(
+                    opts.parent_attr, opts.left_attr, opts.right_attr, 
+                    opts.tree_id_attr, opts.level_attr))
         
 
 class Model(models.Model):
