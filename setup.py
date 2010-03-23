@@ -45,17 +45,10 @@ for dirpath, dirnames, filenames in os.walk(mptt_dir):
     elif filenames:
         data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
 
-# Dynamically calculate the version based on mptt.VERSION
-version_tuple = __import__('mptt').VERSION
-if version_tuple[2] is not None:
-    version = "%d.%d_%s" % version_tuple
-else:
-    version = "%d.%d" % version_tuple[:2]
-
 setup(
     name = 'django-mptt',
     description = 'Utilities for implementing Modified Preorder Tree Traversal with your Django Models and working with trees of Model instances',
-    version = version,
+    version = '0.3_pre',
     author = 'Jonathan Buchanan',
     author_email = 'jonathan.buchanan@gmail.com',
     url = 'http://code.google.com/p/django-mptt/',
